@@ -1,44 +1,33 @@
-# Carbon‑Aware Workload Orchestrator
+# Carbon-aware workload orchestrator
 
-This repository demonstrates an orchestrator that dispatches compute
-jobs to different regions or data centers based on real‑time carbon
-intensity data.  The orchestrator queries an emissions API, compares
-available regions, and selects the location with the lowest carbon
-intensity at the time of job submission.
+A local FastAPI simulation that chooses the region with the lowest sampled
+carbon intensity. Three regions receive illustrative random values at startup.
+Submitted work is simulated with a short asynchronous delay. Job status now
+tracks the background task, including the period before its queue starts.
 
-## Features
-
-- Periodically fetches carbon intensity data from a public API.
-- Maintains a registry of compute regions with their queue and
-  capacity status.
-- Routes incoming jobs to the region with the minimum carbon
-  intensity while respecting capacity constraints.
-- Provides a RESTful API for job submission and status checking.
-
-## Usage
-
-Install dependencies and run the orchestrator:
+## Run the example
 
 ```bash
-pip install -r requirements.txt
-python orchestrator.py
+python -m pip install -r requirements.txt
+python -m uvicorn orchestrator:app --host 127.0.0.1 --port 8000
 ```
 
-Submit a job:
+In a second terminal:
 
 ```bash
-curl -X POST http://localhost:8000/jobs -H 'Content-Type: application/json' \
-     -d '{"job_id": "abc123", "payload": "Hello, world!"}'
+curl -X POST http://127.0.0.1:8000/jobs -H "Content-Type: application/json" -d '{"job_id":"demo-1","payload":"synthetic workload"}'
+curl http://127.0.0.1:8000/jobs/demo-1
 ```
 
-Check job status:
+Submission returns the selected region. Status progresses from `queued` to
+`completed`, with `failed` for a cancelled or failed task. A duplicate ID
+returns HTTP 400. Jobs and task records remain in memory for the process
+lifetime. Real emissions feeds, capacity limits, and cluster execution would
+be additional integrations.
+
+## Verify
 
 ```bash
-curl http://localhost:8000/jobs/abc123
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
 ```
-
-## Extending
-
-Integrate with real emissions data providers and real compute clusters.
-Add authentication, persistent storage, and retry logic for a more
-robust system.

@@ -30,9 +30,10 @@ class Region:
     async def add_job(self, job: Job) -> None:
         # Simulate asynchronous job processing
         self.queue[job.job_id] = job
-        await asyncio.sleep(random.uniform(0.1, 0.5))
-        # In a real system, job completion would be signaled separately
-        del self.queue[job.job_id]
+        try:
+            await asyncio.sleep(random.uniform(0.1, 0.5))
+        finally:
+            self.queue.pop(job.job_id, None)
 
 
 class Orchestrator:
@@ -46,6 +47,7 @@ class Orchestrator:
         }
         # Track submitted jobs
         self.jobs: Dict[str, str] = {}
+        self.tasks: Dict[str, asyncio.Task] = {}
 
     def select_region(self) -> Region:
         # Choose region with lowest carbon intensity
@@ -57,15 +59,19 @@ class Orchestrator:
         region = self.select_region()
         self.jobs[job.job_id] = region.name
         # Fire off job processing asynchronously
-        asyncio.create_task(region.add_job(job))
+        self.tasks[job.job_id] = asyncio.create_task(region.add_job(job))
         return region.name
 
     def get_status(self, job_id: str) -> Optional[str]:
         region_name = self.jobs.get(job_id)
         if region_name is None:
             return None
-        region = self.regions[region_name]
-        return "queued" if job_id in region.queue else "completed"
+        task = self.tasks[job_id]
+        if not task.done():
+            return "queued"
+        if task.cancelled() or task.exception() is not None:
+            return "failed"
+        return "completed"
 
 
 app = FastAPI(title="Carbon‑Aware Orchestrator", version="0.1.0")
